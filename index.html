@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0c10">
+<meta name="description" content="Tactical tournament command deck for Mechtronica CODM: live status, squad roster, knockout bracket and round-robin matrix.">
+<title>MECHTRONICA CODM // TACTICAL COMMAND</title>
+
+<!-- Inline SVG favicon: a red crosshair reticle, so the project ships with zero image assets -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d91636' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='7'/%3E%3Cpath d='M12 1v4M12 19v4M1 12h4M19 12h4'/%3E%3Ccircle cx='12' cy='12' r='1.6' fill='%23d91636'/%3E%3C/svg%3E">
+
+<!-- Google Fonts: Orbitron (display/alert digits), Rajdhani (headers/labels). Both fall back to system fonts if blocked. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+<!-- Pure CSS3, no framework, single file. Kept in the same directory as this file for GitHub Pages. -->
+<link rel="stylesheet" href="styles.css">
+
+<!--
+  Plain (non-module) scripts loaded in dependency order via defer:
+  app.js builds window.App and MUST run first; the rest register themselves onto it.
+-->
+<script defer src="app.js"></script>
+<script defer src="teams.js"></script>
+<script defer src="bracket.js"></script>
+<script defer src="league.js"></script>
+</head>
+
+<body>
+<a href="#main" class="skip-link">Skip to content</a>
+
+<!-- Fixed full-viewport scanline + vignette overlay. Purely decorative: aria-hidden, no pointer events. -->
+<div class="hud-overlay" aria-hidden="true"></div>
+
+<!-- =========================================================================
+     HUD TOP NAVIGATION — brand, the four tabs, and a live squad counter.
+     On narrow screens the tab strip becomes a horizontally scrollable row.
+     ========================================================================= -->
+<header class="hud-topbar">
+  <div class="hud-brand">
+    <span class="hud-brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+    </span>
+    <div class="hud-brand-text">
+      <p class="hud-brand-title">MECHTRONICA</p>
+      <p class="hud-brand-tag">CODM // TACTICAL COMMAND</p>
+    </div>
+  </div>
+
+  <nav class="hud-nav" aria-label="Primary">
+    <button type="button" class="hud-tab" data-tab="warroom">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11a8 8 0 0 1 16 0M2 11h20M12 11v10M8 21h8"/><circle cx="12" cy="6" r="1.4" fill="currentColor" stroke="none"/></svg>
+      <span>War Room</span>
+    </button>
+    <button type="button" class="hud-tab" data-tab="roster">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>Squad Roster</span>
+    </button>
+    <button type="button" class="hud-tab" data-tab="bracket">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="4" rx="1"/><rect x="3" y="16" width="5" height="4" rx="1"/><rect x="16" y="10" width="5" height="4" rx="1"/><path d="M8 6h3v12H8M11 12h5"/></svg>
+      <span>Top 8 Bracket</span>
+    </button>
+    <button type="button" class="hud-tab" data-tab="league">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+      <span>Round-Robin</span>
+    </button>
+  </nav>
+
+  <div class="hud-meta">
+    <span class="hud-meta-value" data-shell-stat="teams">0</span>
+    <span class="hud-meta-label">Squads</span>
+    <button type="button" class="btn btn-ghost btn-sm" data-action="reset-all">Wipe Data</button>
+  </div>
+</header>
+
+<!-- =========================================================================
+     MAIN — one <section> per tab. app.js toggles the hidden attribute.
+     ========================================================================= -->
+<main id="main">
+
+  <!-- ------------------------------- WAR ROOM ------------------------------- -->
+  <section id="view-warroom" data-view="warroom" class="view" aria-labelledby="warroom-title">
+
+    <!-- Flashing Lobby Alert: room ID / password / join timer, broadcast to viewers -->
+    <div id="lobby-alert" class="lobby-alert">
+      <div class="lobby-alert-main">
+        <span class="lobby-flag">
+          <span class="lobby-dot" aria-hidden="true"></span>LOBBY ALERT
+        </span>
+        <div class="lobby-fields">
+          <div class="lobby-field"><span class="lobby-field-label">Room ID</span><span id="lobby-room-display" class="lobby-field-value">— — — —</span></div>
+          <div class="lobby-field"><span class="lobby-field-label">Password</span><span id="lobby-pass-display" class="lobby-field-value">— — — —</span></div>
+          <div class="lobby-field lobby-field-timer">
+            <span class="lobby-field-label">Join window closes in</span>
+            <span id="lobby-timer-display" class="lobby-field-value lobby-timer">--:--</span>
+          </div>
+        </div>
+      </div>
+      <button type="button" id="lobby-edit-toggle" class="btn btn-ghost btn-sm">Broadcast controls</button>
+    </div>
+
+    <!-- Admin panel to set the values shown in the banner above. Hidden by default. -->
+    <form id="lobby-form" class="panel lobby-form" hidden>
+      <div class="lobby-form-grid">
+        <label class="field">
+          <span class="field-label">Room ID</span>
+          <input type="text" id="lobby-room-input" class="input" placeholder="482 913" maxlength="24">
+        </label>
+        <label class="field">
+          <span class="field-label">Password</span>
+          <input type="text" id="lobby-pass-input" class="input" placeholder="MTX2026" maxlength="24">
+        </label>
+        <label class="field">
+          <span class="field-label">Join window (minutes)</span>
+          <input type="number" id="lobby-minutes-input" class="input" min="1" max="60" value="2" inputmode="numeric">
+        </label>
+      </div>
+      <div class="lobby-form-actions">
+        <button type="submit" class="btn btn-primary">Broadcast &amp; start timer</button>
+        <button type="button" id="lobby-clear-btn" class="btn btn-danger">Clear alert</button>
+      </div>
+    </form>
+
+    <header class="view-header">
+      <h1 id="warroom-title" class="view-title">War Room</h1>
+      <p class="view-sub">Live telemetry for casters, captains and spectators. Search a squad to pull its current tournament status.</p>
+    </header>
+
+    <form id="lookup-form" class="lookup-bar" autocomplete="off">
+      <input type="text" id="lookup-input" class="input" placeholder="Type a squad name…" aria-label="Search for a squad">
+      <button type="submit" class="btn btn-primary">Locate squad</button>
+    </form>
+
+    <div id="lookup-result" class="lookup-result" hidden></div>
+
+    <h2 class="section-title">Live squad grid</h2>
+    <div id="status-grid" class="status-grid"></div>
+    <div id="status-grid-empty" class="empty-state">
+      <p class="empty-title">No squads on record</p>
+      <p class="empty-text">Register squads on the Squad Roster tab to populate live telemetry here.</p>
+    </div>
+  </section>
+
+  <!-- ------------------------------ SQUAD ROSTER ---------------------------- -->
+  <section id="view-roster" data-view="roster" class="view" hidden aria-labelledby="roster-title">
+    <header class="view-header">
+      <h1 id="roster-title" class="view-title">Squad Roster</h1>
+      <p class="view-sub">Registration order sets bracket seeding — put your top squads first. Rename or delete a squad without losing its slot.</p>
+    </header>
+
+    <div class="grid-two">
+      <div class="stack">
+
+        <form id="roster-form" class="panel p-5" novalidate>
+          <label for="roster-textarea" class="field-label">Bulk-add squads</label>
+          <textarea id="roster-textarea" class="input roster-textarea" rows="3" placeholder="Phantom Squad, Iron Wolves, Crimson Reapers, Ghost Protocol"></textarea>
+          <p class="hint mt-2">Separate names with commas. A single name works too.</p>
+          <p id="roster-error" class="form-error" role="alert" hidden></p>
+          <div class="roster-form-actions">
+            <button type="submit" class="btn btn-primary">Deploy squads</button>
+            <button type="button" id="roster-demo-btn" class="btn btn-ghost">Load demo squads</button>
+          </div>
+        </form>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">Registered squads <span id="roster-count" class="chip ml-2">0</span></h2>
+            <button type="button" id="roster-clear-btn" class="btn btn-danger btn-sm">Disband all</button>
+          </div>
+          <ul id="roster-list" aria-live="polite"></ul>
+          <div id="roster-empty" class="empty-state">
+            <p class="empty-title">No squads yet</p>
+            <p class="empty-text">Add names above, or load the demo roster to try the bracket right away.</p>
+          </div>
+        </div>
+      </div>
+
+      <aside class="stack">
+        <div class="panel p-5">
+          <h2 class="panel-title mb-4">Roster telemetry</h2>
+          <dl class="stat-list">
+            <div><dt>Bracket size</dt><dd id="stat-size">–</dd></div>
+            <div><dt>Round 1 byes</dt><dd id="stat-byes">–</dd></div>
+            <div><dt>Knockout rounds</dt><dd id="stat-rounds">–</dd></div>
+            <div><dt>League fixtures</dt><dd id="stat-fixtures">–</dd></div>
+          </dl>
+        </div>
+        <div class="panel p-5">
+          <h2 class="panel-title mb-2">Editing after kickoff</h2>
+          <p class="text-muted text-sm">The bracket and league each keep a snapshot of the roster from the moment they were generated, so editing this list never silently corrupts a running match. Regenerate to pull in changes.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- -------------------------------- BRACKET ------------------------------- -->
+  <section id="view-bracket" data-view="bracket" class="view" hidden aria-labelledby="bracket-title">
+    <header class="view-header">
+      <h1 id="bracket-title" class="view-title">Top 8 Tactical Bracket</h1>
+      <p class="view-sub">Click a squad to advance it. Click the winner again to overturn the result — the connector line only lights once a round is decided.</p>
+    </header>
+
+    <div class="toolbar">
+      <button type="button" id="bracket-generate-btn" class="btn btn-primary">Generate bracket</button>
+      <button type="button" id="bracket-clear-btn" class="btn btn-ghost">Clear results</button>
+      <label class="switch" title="Randomise seeding instead of using roster order">
+        <input type="checkbox" id="bracket-shuffle">
+        <span class="switch-track" aria-hidden="true"></span>
+        <span>Shuffle seeding</span>
+      </label>
+      <span id="bracket-progress" class="chip toolbar-end" hidden></span>
+    </div>
+
+    <div id="bracket-notice" class="notice mb-6" hidden></div>
+    <div id="bracket-champion" class="mb-6" hidden></div>
+
+    <div id="bracket-empty" class="panel empty-state">
+      <p class="empty-title">No bracket deployed</p>
+      <p id="bracket-empty-text" class="empty-text"></p>
+    </div>
+
+    <div id="bracket-scroll" class="bracket-scroll" hidden tabindex="0" aria-label="Tournament bracket, scrolls horizontally">
+      <div id="bracket-tree" class="bracket-tree"></div>
+    </div>
+  </section>
+
+  <!-- ------------------------------ ROUND ROBIN ----------------------------- -->
+  <section id="view-league" data-view="league" class="view" hidden aria-labelledby="league-title">
+    <header class="view-header">
+      <h1 id="league-title" class="view-title">Round-Robin Matrix</h1>
+      <p class="view-sub">Every squad meets every other squad once. A win is worth 2 points, a loss 0 — enter each fixture's score to update standings instantly.</p>
+    </header>
+
+    <div class="toolbar">
+      <button type="button" id="league-generate-btn" class="btn btn-primary">Generate schedule</button>
+      <button type="button" id="league-clear-btn" class="btn btn-ghost">Clear scores</button>
+      <span id="league-progress" class="chip toolbar-end" hidden></span>
+    </div>
+
+    <div id="league-notice" class="notice mb-6" hidden></div>
+
+    <div id="league-empty" class="panel empty-state">
+      <p class="empty-title">No schedule deployed</p>
+      <p id="league-empty-text" class="empty-text"></p>
+    </div>
+
+    <div id="league-content" class="stack" hidden>
+      <div class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Standings</h2>
+          <p class="hint">Win = 2 pts · Loss = 0 pts · a tied score splits 1 pt each</p>
+        </div>
+        <div class="table-wrap"><div id="league-standings"></div></div>
+      </div>
+
+      <div>
+        <h2 class="section-title">Matchday fixtures</h2>
+        <div id="league-fixtures" class="fixture-grid"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Confirmation dialog, driven by App.confirm() in app.js -->
+<dialog id="confirm-dialog" class="modal" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+  <form method="dialog" class="p-6">
+    <h2 id="confirm-title" class="modal-title">Confirm action</h2>
+    <p id="confirm-message" class="modal-text"></p>
+    <div class="modal-actions">
+      <button type="submit" value="cancel" class="btn btn-ghost">Cancel</button>
+      <button type="submit" value="ok" id="confirm-ok" class="btn btn-primary">Confirm</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Toast notifications, appended here by App.toast() -->
+<div id="toast-root" aria-live="polite"></div>
+
+</body>
+</html>
